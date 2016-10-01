@@ -1,0 +1,21 @@
+{
+  "name": "Gantt",
+  "description": "test project",
+  "main": "",
+  "authors": [
+    "nvenevitin"
+  ],
+  "license": "MIT",
+  "homepage": "https://github.com/venevitinnikita/playground",
+  "moduleType": [],
+  "ignore": [
+    "**/.*",
+    "node_modules",
+    "bower_components",
+    "test",
+    "tests"
+  ],
+  "dependencies": {
+    "gantt": "^4.1.0"
+  }
+}
