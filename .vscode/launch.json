@@ -6,8 +6,14 @@
             "type": "chrome",
             "request": "attach",
             "port": 9222,
-            "sourceMaps": false,
+            "sourceMaps": true,
             "webRoot": "${workspaceRoot}"
+        },
+        {
+            "name": "Launch index.html (without sourcemaps)",
+            "type": "chrome",
+            "request": "launch",
+            "file": "${workspaceRoot}/index.html"
         }
     ]
 }

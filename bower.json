@@ -1,5 +1,5 @@
 {
-  "name": "Gantt",
+  "name": "gantt",
   "description": "test project",
   "main": "",
   "authors": [
@@ -16,6 +16,7 @@
     "tests"
   ],
   "dependencies": {
-    "gantt": "^4.1.0"
+    "gantt": "^4.1.0",
+    "abdmob/x2js": "^1.2.0"
   }
 }
