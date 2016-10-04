@@ -1,5 +1,10 @@
 window.onload = function () {
     gantt.config.autosize = "xy";
+    gantt.config.scale_unit = "year";
+    gantt.config.date_scale = "%Y";
+    gantt.config.subscales = [
+        { unit: "month", step: 1, date: "%M" }
+    ];
 
     gantt.init("gantt_div");
     // gantt.load("content.xml", "xml");
@@ -25,13 +30,19 @@ var util = {
             func(arr, 0, null);
         }
     },
-    fillAttributes: function (arr, obj) {
+    fillAttributes: function (arr, obj, excludes) {
         this.checkedForEach(arr, function (attribute, i, array) {
+            if (excludes && excludex.includes(attribute._name)) {
+                return;
+            }
             obj[attribute._name] = attribute.__text;
         });
     },
-    copyAttributes: function (from, to) {
+    copyAttributes: function (from, to, excludes) {
         for (var key in from) {
+            if (excludes && excludex.includes(key)) {
+                continue;
+            }
             to[key] = from[key];
         }
     }
@@ -44,10 +55,6 @@ gantt.templates.tooltip_text = function (start, end, task) {
 var x2js = new X2JS();
 
 gantt.xml.parse = function (text, loader) {
-    /* Если в данных содержится запись с id == 0, то получим 
-       бесконечную рекурсию (gantt.config.root_id == 0 по-умолчанию) */
-    gantt.config.root_id = -1;
-
     var data = {};
     if (text.indexOf('anygant') < 0) {
         loader = this._getXML(text, loader);
@@ -59,6 +66,10 @@ gantt.xml.parse = function (text, loader) {
 
         data.collections = this._getCollections(loader);
     } else {
+        /* Если в данных содержится запись с id == 0, то получим 
+           бесконечную рекурсию (gantt.config.root_id == 0 по-умолчанию) */
+        gantt.config.root_id = -1;
+
         var json = x2js.xml_str2json(text).anygantt;
 
         processDataGrid(json.datagrid);
@@ -118,7 +129,8 @@ function processResourceChart(resourceChart) {
         var data = {};
         data.id = resource._id;
         data.text = data.Name = resource._name;
-        data.open = resource._expanded === 'true'
+        data.open = resource._expanded === 'true';
+        data.style = resource._style;
         if (resource._parent) data.parent = resource._parent;
 
         if (resource.attributes) {
@@ -129,31 +141,51 @@ function processResourceChart(resourceChart) {
         var periods = [];
         util.checkedForEach(resourceChart.periods.period, function (period, i, arr) {
             if (period._resource_id === id) {
-                var task = {};
-
-                var start_date_str = period._start.replaceAll(' ', 'T') // to ISO 8601
-                task.start_date = new Date(start_date_str);
-
-                var end_date_str = period._end.replaceAll(' ', 'T') // to ISO 8601
-                task.end_date = new Date(end_date_str);
-
-                util.fillAttributes(period.attributes.attribute, task);
-                periods.push(task);
+                if (period._name !== 'null' &&
+                    ['transparent'/*, 'transparent_group'*/].indexOf(period._style) < 0) {
+                    periods.push(period);
+                } else {
+                    /* TODO такие периоды используются для обработки
+                            клика по пустой области */
+                }
             }
         });
+        var subtasks = [];
         if (periods.length == 1) {
-            util.copyAttributes(periods[0], data);
+            period2task(periods[0], data);
         } else {
             periods.forEach(function (period, i, arr) {
-                /* TODO:
-                    1. Рассчитывать min(start_date), max(end_date)
-                    2. Создавать task с таким интервалом и "visibility: hidden;"
-                    3. Создавать дочерние таски */
+                var subtask = {};
+                period2task(period, subtask);
+
+                if (!data.start_date || subtask.start_date < data.start_date)
+                    data.start_date = subtask.start_date;
+                if (!data.end_date || subtask.end_date > data.end_date)
+                    data.end_date = subtask.end_date;
+
+                subtask.id = period._id;
+                subtask.text = subtask.Name = '';
+                subtask.parent = id;
+                subtask.style = period._style;
+
+                subtasks.push(subtask);
             });
         }
 
-        datas[i] = data;
+        datas.push(data);
+        if (subtasks.length > 0)
+            Array.prototype.push.apply(datas, subtasks);
     });
 
     return datas;
+}
+
+function period2task(period, task) {
+    var start_date_str = period._start.replaceAll(' ', 'T'); // to ISO 8601
+    task.start_date = new Date(start_date_str);
+
+    var end_date_str = period._end.replaceAll(' ', 'T'); // to ISO 8601
+    task.end_date = new Date(end_date_str);
+
+    util.fillAttributes(period.attributes.attribute, task);
 }
