@@ -1,3 +1,5 @@
+/* global gantt X2JS */
+
 window.onload = function () {
     gantt.config.autosize = "xy";
     gantt.config.scale_unit = "year";
@@ -9,6 +11,10 @@ window.onload = function () {
     gantt.init("gantt_div");
     // gantt.load("content.xml", "xml");
     gantt.load("example-data.xml", "xml");
+}
+
+gantt.templates.tooltip_text = function (start, end, task) {
+    return task.title;
 }
 
 String.prototype.replaceAll = function (find, replacement) {
@@ -31,8 +37,8 @@ var util = {
         }
     },
     fillAttributes: function (arr, obj, excludes) {
-        this.checkedForEach(arr, function (attribute, i, array) {
-            if (excludes && excludex.includes(attribute._name)) {
+        this.checkedForEach(arr, function (attribute) {
+            if (excludes && excludes.includes(attribute._name)) {
                 return;
             }
             obj[attribute._name] = attribute.__text;
@@ -40,7 +46,7 @@ var util = {
     },
     copyAttributes: function (from, to, excludes) {
         for (var key in from) {
-            if (excludes && excludex.includes(key)) {
+            if (excludes && excludes.includes(key)) {
                 continue;
             }
             to[key] = from[key];
@@ -48,15 +54,12 @@ var util = {
     }
 }
 
-gantt.templates.tooltip_text = function (start, end, task) {
-    return task.title;
-}
-
 var x2js = new X2JS();
 
 gantt.xml.parse = function (text, loader) {
     var data = {};
     if (text.indexOf('anygant') < 0) {
+        /* Стандартная реализация parse */
         loader = this._getXML(text, loader);
         var evs = data.data = [];
         var xml = gantt.ajax.xpath("//task", loader);
@@ -86,7 +89,7 @@ gantt.xml.parse = function (text, loader) {
 
 function processDataGrid(datagrid) {
     gantt.config.columns = [];
-    datagrid.columns.column.forEach(function (column, i, array) {
+    datagrid.columns.column.forEach(function (column) {
         var label = column.header.text;
 
         var ganttColumn = {};
@@ -125,7 +128,7 @@ function processDataGrid(datagrid) {
 
 function processResourceChart(resourceChart) {
     var datas = [];
-    resourceChart.resources.resource.forEach(function (resource, i, array) {
+    resourceChart.resources.resource.forEach(function (resource) {
         var data = {};
         data.id = resource._id;
         data.text = data.Name = resource._name;
@@ -139,7 +142,7 @@ function processResourceChart(resourceChart) {
 
         var id = resource._id;
         var periods = [];
-        util.checkedForEach(resourceChart.periods.period, function (period, i, arr) {
+        util.checkedForEach(resourceChart.periods.period, function (period) {
             if (period._resource_id === id) {
                 if (period._name !== 'null' &&
                     ['transparent'/*, 'transparent_group'*/].indexOf(period._style) < 0) {
@@ -154,7 +157,7 @@ function processResourceChart(resourceChart) {
         if (periods.length == 1) {
             period2task(periods[0], data);
         } else {
-            periods.forEach(function (period, i, arr) {
+            periods.forEach(function (period) {
                 var subtask = {};
                 period2task(period, subtask);
 
@@ -173,11 +176,58 @@ function processResourceChart(resourceChart) {
         }
 
         datas.push(data);
-        if (subtasks.length > 0)
-            Array.prototype.push.apply(datas, subtasks);
+        if (subtasks.length > 0) {
+            // Array.prototype.push.apply(datas, subtasks);
+            data.subtasks = subtasks;
+        }
     });
 
+    initMultitaskRendering();
+
     return datas;
+}
+
+function initMultitaskRendering() {
+    gantt._sync_order_item = function (item, hidden, row) {
+        if (item.id !== gantt.config.root_id) {  //do not trigger event for virtual root
+            this._order_full.push(item.id);
+            if (!hidden && this._filter_task(item.id, item) &&
+                this.callEvent("onBeforeTaskDisplay", [item.id, item])) {
+                this._order.push(item.id);
+                this._order_search[item.id] = row ? row : this._order.length - 1;
+            }
+        }
+
+        var children = this.getChildren(item.id);
+        if (children) {
+            for (var i = 0; i < children.length; i++)
+                this._sync_order_item(this._pull[children[i]], hidden || !item.$open);
+        }
+
+        var subtasks = item.subtasks;
+        if (subtasks) {
+            for (var i = 0; i < subtasks.length; i++) {
+                var subtask = subtasks[i];
+                this._sync_order_item(subtask, hidden || !item.$open, this._order.length - 1);
+            }
+        }
+    };
+    gantt._build_pull = function (tasks) {
+        var task = null,
+            loaded = [];
+        for (var i = 0, len = tasks.length; i < len; i++) {
+            task = tasks[i];
+            if (this._load_task(task))
+                loaded.push(task);
+
+            var subtasks = task.subtasks;
+            if (subtasks) {
+                for (var i = 0, len = subtasks.length; i < len; i++)
+                    this._load_task(subtasks[i]);
+            }
+        }
+        return loaded;
+    };
 }
 
 function period2task(period, task) {
@@ -188,4 +238,8 @@ function period2task(period, task) {
     task.end_date = new Date(end_date_str);
 
     util.fillAttributes(period.attributes.attribute, task);
+}
+
+function processProjectChart() {
+    // TODO
 }

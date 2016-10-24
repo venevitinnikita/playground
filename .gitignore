@@ -2,3 +2,5 @@ node_modules/
 bower_components/
 example-data.xml
 typings/
+npm-debug.log*
+remove-logs.kts

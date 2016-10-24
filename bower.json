@@ -17,7 +17,6 @@
   ],
   "dependencies": {
     "gantt": "^4.1.0",
-    "abdmob/x2js": "^1.2.0",
-    "scheduler": "4.1.0"
+    "abdmob/x2js": "^1.2.0"
   }
 }
