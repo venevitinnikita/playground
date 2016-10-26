@@ -1,0 +1,8 @@
+.caption_task{
+    border: 2px solid rgba(255, 200, 0, 0.8);
+    color: #6ba8e3;
+    background: rgba(255, 200, 0, 0.5);
+}
+.caption_task .gantt_task_progress{
+    background: #D9DF29;
+}

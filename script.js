@@ -8,9 +8,17 @@ window.onload = function () {
         { unit: "month", step: 1, date: "%M" }
     ];
 
+    // gantt.config.scale_unit = "month";
+    // gantt.config.date_scale = "%M";
+    // gantt.config.subscales = [
+    //     { unit: "day", step: 3, date: "%D" }
+    // ];
+
     gantt.init("gantt_div");
     // gantt.load("content.xml", "xml");
     gantt.load("example-data.xml", "xml");
+
+    // util.watch(gantt, '_pull');
 }
 
 gantt.templates.tooltip_text = function (start, end, task) {
@@ -44,6 +52,9 @@ var util = {
             obj[attribute._name] = attribute.__text;
         });
     },
+    copyAttribute: function (from, to, attribute) {
+        if (from[attribute]) to[attribute] = from[attribute];
+    },
     copyAttributes: function (from, to, excludes) {
         for (var key in from) {
             if (excludes && excludes.includes(key)) {
@@ -51,6 +62,22 @@ var util = {
             }
             to[key] = from[key];
         }
+    },
+    watch: function (obj, prop, callback) {
+        var origin = obj[prop];
+        if (!callback) callback = function () {
+            debugger;
+        }
+        Object.defineProperty(obj, prop, {
+            get: function () {
+                callback();
+                return origin;
+            },
+            set: function (value) {
+                callback();
+                origin = value;
+            }
+        })
     }
 }
 
@@ -89,7 +116,7 @@ gantt.xml.parse = function (text, loader) {
 
 function processDataGrid(datagrid) {
     gantt.config.columns = [];
-    datagrid.columns.column.forEach(function (column) {
+    datagrid.columns.column.forEach(function (column, i) {
         var label = column.header.text;
 
         var ganttColumn = {};
@@ -114,8 +141,7 @@ function processDataGrid(datagrid) {
         ganttColumn.template = function (obj) {
             var attributeName = column.format
                 .replaceAll('{%', '').replaceAll('}', '');
-            var value = obj[attributeName];
-            return value || '';
+            return obj ? obj[attributeName] || '' : '';
         }
 
         gantt.config.columns[i] = ganttColumn;
@@ -144,13 +170,13 @@ function processResourceChart(resourceChart) {
         var periods = [];
         util.checkedForEach(resourceChart.periods.period, function (period) {
             if (period._resource_id === id) {
-                if (period._name !== 'null' &&
-                    ['transparent'/*, 'transparent_group'*/].indexOf(period._style) < 0) {
-                    periods.push(period);
-                } else {
-                    /* TODO такие периоды используются для обработки
-                            клика по пустой области */
+                if (period._name === 'null' ||
+                    ['transparent', 'transparent_group'].indexOf(period._style) >= 0) {
+                    /* Такие периоды используются как заголовки в области задач */
+                    period.transparent = true;
+                    period.type = gantt.config.types.caption;
                 }
+                periods.push(period);
             }
         });
         var subtasks = [];
@@ -171,71 +197,53 @@ function processResourceChart(resourceChart) {
                 subtask.parent = id;
                 subtask.style = period._style;
 
+                /* Это свойство будет проверяться при отрисовке таблицы:
+                   для task'ов с этим свойством не будет добавляться строка */
+                subtask.subtask = true;
+
                 subtasks.push(subtask);
             });
         }
 
         datas.push(data);
-        if (subtasks.length > 0) {
-            // Array.prototype.push.apply(datas, subtasks);
-            data.subtasks = subtasks;
-        }
+        if (subtasks.length > 0) data.subtasks = subtasks;
     });
 
-    initMultitaskRendering();
+    addCustomTaskType();
 
     return datas;
 }
 
-function initMultitaskRendering() {
-    gantt._sync_order_item = function (item, hidden, row) {
-        if (item.id !== gantt.config.root_id) {  //do not trigger event for virtual root
-            this._order_full.push(item.id);
-            if (!hidden && this._filter_task(item.id, item) &&
-                this.callEvent("onBeforeTaskDisplay", [item.id, item])) {
-                this._order.push(item.id);
-                this._order_search[item.id] = row ? row : this._order.length - 1;
-            }
+/* Для PRO версии */
+function addCustomTaskType() {
+    gantt.config.types.caption = "caption";
+    gantt.templates.task_class = function (start, end, task) {
+        if (task.type == gantt.config.types.caption) {
+            return "caption_task";
         }
-
-        var children = this.getChildren(item.id);
-        if (children) {
-            for (var i = 0; i < children.length; i++)
-                this._sync_order_item(this._pull[children[i]], hidden || !item.$open);
-        }
-
-        var subtasks = item.subtasks;
-        if (subtasks) {
-            for (var i = 0; i < subtasks.length; i++) {
-                var subtask = subtasks[i];
-                this._sync_order_item(subtask, hidden || !item.$open, this._order.length - 1);
-            }
-        }
+        return "";
     };
-    gantt._build_pull = function (tasks) {
-        var task = null,
-            loaded = [];
-        for (var i = 0, len = tasks.length; i < len; i++) {
-            task = tasks[i];
-            if (this._load_task(task))
-                loaded.push(task);
-
-            var subtasks = task.subtasks;
-            if (subtasks) {
-                for (var i = 0, len = subtasks.length; i < len; i++)
-                    this._load_task(subtasks[i]);
-            }
+    gantt.templates.task_class = function (start, end, task) {
+        if (task.type == gantt.config.types.caption) {
+            return "caption_task";
         }
-        return loaded;
+        return "";
     };
 }
 
 function period2task(period, task) {
+    function copyAttribute(attribute) {
+        util.copyAttribute(period, task, attribute);
+    }
+
     var start_date_str = period._start.replaceAll(' ', 'T'); // to ISO 8601
     task.start_date = new Date(start_date_str);
 
     var end_date_str = period._end.replaceAll(' ', 'T'); // to ISO 8601
     task.end_date = new Date(end_date_str);
+
+    copyAttribute('transparent');
+    copyAttribute('type');
 
     util.fillAttributes(period.attributes.attribute, task);
 }
