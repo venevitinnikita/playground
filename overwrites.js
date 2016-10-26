@@ -1,14 +1,19 @@
 /* global gantt */
 
+/**
+ * Объект, который хранит дефолтные реализации функций
+ */
 var originals = {};
 
-gantt._sync_order_item = function (item, hidden, row) {
+var tasksCount = 0;
+gantt._sync_order_item = function (item, hidden) {
     if (item.id !== gantt.config.root_id) {  //do not trigger event for virtual root
         this._order_full.push(item.id);
         if (!hidden && this._filter_task(item.id, item) &&
             this.callEvent("onBeforeTaskDisplay", [item.id, item])) {
             this._order.push(item.id);
-            this._order_search[item.id] = row ? row : this._order.length - 1;
+            if (!item.row) item.row = tasksCount++;
+            this._order_search[item.id] = item.row;
         }
     }
 
@@ -22,12 +27,11 @@ gantt._sync_order_item = function (item, hidden, row) {
        расположенных на той же строке, что и текущая  */
     var subtasks = item.subtasks;
     if (subtasks) {
-        var row = this._order.length - 1;
         for (var i = 0; i < subtasks.length; i++) {
             var subtask = subtasks[i];
             if (!subtask.row)
-                subtask.row = row;
-            this._sync_order_item(subtask, hidden || !item.$open, subtask.row);
+                subtask.row = tasksCount;
+            this._sync_order_item(subtask, hidden || !item.$open);
             if (!this._pull[subtask.id])
                 this._pull[subtask.id] = subtask;
         }
