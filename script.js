@@ -78,6 +78,13 @@ var util = {
                 origin = value;
             }
         })
+    },
+    getDefined: function (obj, properties) {
+        var result = null;
+        properties.forEach(function (property) {
+            if (obj[property]) result = obj[property];
+        });
+        return result;
     }
 }
 
@@ -153,6 +160,11 @@ function processDataGrid(datagrid) {
 }
 
 function processResourceChart(resourceChart) {
+    initCaptionTaskType();
+    initTaskTextTemplate();
+    initCaptionTaskRenderer();
+    initCaptionTaskLayer();
+
     var datas = [];
     resourceChart.resources.resource.forEach(function (resource) {
         var data = {};
@@ -173,7 +185,6 @@ function processResourceChart(resourceChart) {
                 if (period._name === 'null' ||
                     ['transparent', 'transparent_group'].indexOf(period._style) >= 0) {
                     /* Такие периоды используются как заголовки в области задач */
-                    period.transparent = true;
                     period.type = gantt.config.types.caption;
                 }
                 periods.push(period);
@@ -184,6 +195,8 @@ function processResourceChart(resourceChart) {
             period2task(periods[0], data);
         } else {
             periods.forEach(function (period) {
+                data.type = gantt.config.types.caption;
+
                 var subtask = {};
                 period2task(period, subtask);
 
@@ -209,13 +222,11 @@ function processResourceChart(resourceChart) {
         if (subtasks.length > 0) data.subtasks = subtasks;
     });
 
-    addCustomTaskType();
-
     return datas;
 }
 
 /* Для PRO версии */
-function addCustomTaskType() {
+function initCaptionTaskType() {
     gantt.config.types.caption = "caption";
     gantt.templates.task_class = function (start, end, task) {
         if (task.type == gantt.config.types.caption) {
@@ -223,12 +234,37 @@ function addCustomTaskType() {
         }
         return "";
     };
-    gantt.templates.task_class = function (start, end, task) {
-        if (task.type == gantt.config.types.caption) {
-            return "caption_task";
-        }
-        return "";
+}
+
+function initCaptionTaskRenderer() {
+    gantt.config.type_renderers[gantt.config.types.caption] = function () {
+        return null;
     };
+}
+
+function initTaskTextTemplate() {
+    gantt.templates.task_text = function (start, end, task) {
+        var text = util.getDefined(task, ["sign", "signCenter"]);
+        return text ? text : task.text;
+    };
+}
+
+function initCaptionTaskLayer() {
+    gantt.addTaskLayer(function (task) {
+        if (task.type === gantt.config.types.caption) {
+            var sizes = gantt.getTaskPosition(task, task.start, task.end);
+            var el = document.createElement('div');
+            el.className = "caption_row";
+            el.innerText = task.text;
+            el.style.left = sizes.left + 'px';
+            el.style.top = sizes.top + 'px';
+            el.style.width = sizes.width + 'px';
+            el.style.height = sizes.height + 'px';
+
+            return el;
+        }
+        return false;
+    });
 }
 
 function period2task(period, task) {
@@ -242,7 +278,6 @@ function period2task(period, task) {
     var end_date_str = period._end.replaceAll(' ', 'T'); // to ISO 8601
     task.end_date = new Date(end_date_str);
 
-    copyAttribute('transparent');
     copyAttribute('type');
 
     util.fillAttributes(period.attributes.attribute, task);

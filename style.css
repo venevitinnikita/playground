@@ -1,8 +1,16 @@
-.caption_task{
-    border: 2px solid rgba(255, 200, 0, 0.8);
-    color: #6ba8e3;
-    background: rgba(255, 200, 0, 0.5);
+.caption_row {
+    position: absolute;
+    text-align: center;
+    font-family: Arial;
+    color: #aaaaaa;
 }
-.caption_task .gantt_task_progress{
+
+.caption_task {
+    visibility: hidden;
+    border: 2px solid rgba(255, 200, 0, 0.2);
+    color: #6ba8e3;
+    background: rgba(255, 200, 0, 0.1);
+}
+.caption_task .gantt_task_progress {
     background: #D9DF29;
 }

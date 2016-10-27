@@ -5,22 +5,28 @@
  */
 var originals = {};
 
-var tasksCount = 0;
+var _default_order_count = 0;
+gantt._sync_order = function (silent) {
+    this._order = [];
+    this._order_full = [];
+    this._order_search = {};
+    _default_order_count = 0;
+    this._sync_order_item({ parent: this.config.root_id, $open: true, $ignore: true, id: this.config.root_id });
+
+    if (!silent) {
+        this._scroll_resize();
+        this._set_sizes();
+    }
+};
 gantt._sync_order_item = function (item, hidden) {
     if (item.id !== gantt.config.root_id) {  //do not trigger event for virtual root
         this._order_full.push(item.id);
         if (!hidden && this._filter_task(item.id, item) &&
             this.callEvent("onBeforeTaskDisplay", [item.id, item])) {
             this._order.push(item.id);
-            if (!item.row) item.row = tasksCount++;
-            this._order_search[item.id] = item.row;
+            if (!item.subtask) _default_order_count++;
+            this._order_search[item.id] = _default_order_count - 1;
         }
-    }
-
-    var children = this.getChildren(item.id);
-    if (children) {
-        for (var i = 0; i < children.length; i++)
-            this._sync_order_item(this._pull[children[i]], hidden || !item.$open);
     }
 
     /* Дополнительная логика по обработке задач,
@@ -29,12 +35,16 @@ gantt._sync_order_item = function (item, hidden) {
     if (subtasks) {
         for (var i = 0; i < subtasks.length; i++) {
             var subtask = subtasks[i];
-            if (!subtask.row)
-                subtask.row = tasksCount;
             this._sync_order_item(subtask, hidden || !item.$open);
             if (!this._pull[subtask.id])
                 this._pull[subtask.id] = subtask;
         }
+    }
+
+    var children = this.getChildren(item.id);
+    if (children) {
+        for (var i = 0; i < children.length; i++)
+            this._sync_order_item(this._pull[children[i]], hidden || !item.$open);
     }
 };
 
@@ -178,7 +188,7 @@ gantt._render_bg_line = function (item) {
     var row = document.createElement("div");
     /* Задачи со свойством transparent используется как заголовки в области задач,
        для них не отрисовываем ячейки */
-    if (gantt.config.show_task_cells && !item.transparent) {
+    if (gantt.config.show_task_cells && item.type !== this.config.types.caption) {
         for (var j = 0; j < count; j++) {
             var width = cfg.width[j],
                 cssclass = "";
