@@ -22,7 +22,7 @@ window.onload = function () {
 }
 
 gantt.templates.tooltip_text = function (start, end, task) {
-    return task.title;
+    return task.title ? task.title.split('\n').join('<br>') : null;
 }
 
 String.prototype.replaceAll = function (find, replacement) {
@@ -78,6 +78,10 @@ var util = {
                 origin = value;
             }
         })
+    },
+    parseISOLocal: function (s) {
+        var b = s.split(/\D/);
+        return new Date(b[0], b[1] - 1, b[2], b[3], b[4]);
     },
     getDefined: function (obj, properties) {
         var result = null;
@@ -273,10 +277,10 @@ function period2task(period, task) {
     }
 
     var start_date_str = period._start.replaceAll(' ', 'T'); // to ISO 8601
-    task.start_date = new Date(start_date_str);
+    task.start_date = util.parseISOLocal(start_date_str);
 
     var end_date_str = period._end.replaceAll(' ', 'T'); // to ISO 8601
-    task.end_date = new Date(end_date_str);
+    task.end_date = util.parseISOLocal(end_date_str);
 
     copyAttribute('type');
 
