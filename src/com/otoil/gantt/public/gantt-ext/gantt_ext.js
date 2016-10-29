@@ -1,26 +1,5 @@
 /* global gantt X2JS */
 
-window.onload = function () {
-    gantt.config.autosize = "xy";
-    gantt.config.scale_unit = "year";
-    gantt.config.date_scale = "%Y";
-    gantt.config.subscales = [
-        { unit: "month", step: 1, date: "%M" }
-    ];
-
-    // gantt.config.scale_unit = "month";
-    // gantt.config.date_scale = "%M";
-    // gantt.config.subscales = [
-    //     { unit: "day", step: 3, date: "%D" }
-    // ];
-
-    gantt.init("gantt_div");
-    // gantt.load("content.xml", "xml");
-    gantt.load("example-data.xml", "xml");
-
-    // util.watch(gantt, '_pull');
-}
-
 gantt.templates.tooltip_text = function (start, end, task) {
     return task.title ? task.title.split('\n').join('<br>') : null;
 }
